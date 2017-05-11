@@ -21,7 +21,7 @@ class PointerNetwork(object):
 		return inputs, seq_lengths
 
 	def encode(self, inputs, seq_lengths):
-		if !self.bidirectional:
+		if not self.bidirectional:
 			cell = tf.nn.rnn_cell.LSTMCell(hidden_dim, initializer = self.init)
 			output, output_state = tf.nn.dynamic_rnn(cell, inputs)
 		else:
