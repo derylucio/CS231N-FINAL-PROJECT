@@ -39,7 +39,7 @@ class PointerNetwork(object):
 		# note that here seq_lengths is a numpy array 
 		with vs.variable_scope("decoder_scope") as scope:
 			def attention(hidden, inputs, to_attend, valid_len, scope="Attention"):
-				with vs.variable_scope(scope):
+				with vs.variable_scope(scope, reuse=True):
 					att_W_in = vs.get_variable("att_W_in", (self.hidden_dim, self.hidden_dim), self.init)
 					att_W_h  =  vs.get_variable("att_W_h", (self.hidden_dim, self.hidden_dim),  self.init)
 					att_V = vs.get_variable("att_V", (self.hidden_dim, ), self.init)
@@ -50,17 +50,17 @@ class PointerNetwork(object):
 					return activations, next_input
 
 
-			decoder_cell = tf.nn.rnn_cell.LSTMCell(hidden_dim, initializer = self.init)
+			decoder_cell = tf.nn.rnn_cell.LSTMCell(hidden_dim, initializer = self.init) # switch if too slow to dynamic_rnn_cell #seq2seq decoder
 			outputs = []
 			batch_size = inputs.get_shape()[0]
 			for i in xrange(batch_size):
-				if i > 0:
-                	vs.get_variable_scope().reuse_variables()
-				input_seq = tf.squeeze(tf.gather(inputs, i))
+				input_seq = tf.squeeze(tf.gather(inputs, i)) # get input of #timesteps
 				attn_seq = tf.squeeze(tf.gather(enc_out, i))
 				prev_hidden = tf.squeeze(tf.gather(enc_end_state, i))
 				prev_in = tf.zeros((1, self.input_dim), dtype=tf.float32, name="decoder_starter")
-				for j in xrange(seq_lengths[i]):
+				for j in xrange(seq_lengths[i] + 1):
+					if j > 0:
+                		vs.get_variable_scope().reuse_variables()
 					prev_hidden = decoder_cell(prev_in, prev_hidden)
 					out, prev_in = attention(prev_hidden, inputs, attn_seq, seq_lengths[i])
 					outputs.append(out)
