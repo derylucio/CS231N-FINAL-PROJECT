@@ -14,42 +14,9 @@ print order_pieces(shuffled_pieces, ordering) #testing shuffle
 '''
 
 import numpy as np
-from scipy import misc
-import matplotlib.pyplot as plt
 import math 
-from PIL import Image
 import random
-from scipy.misc import imread, imsave
-
-outputExt = ".png"
-previewSize = 600   
-zeroPad = 2 		
-maxWidth = 99
-
-def getImageFilename(prefix, (i, j)):
-	return prefix + "_" + str(j).rjust(zeroPad, '0') + "_" + \
-						  str(i).rjust(zeroPad, '0') + outputExt
-    
-def mergeAndShowImage(prefix, permutation):
-	width = len(permutation)
-	reducedSize = previewSize / width
-	imgWidth, imgHeight = reducedSize, reducedSize
-	result = Image.new("RGB", (previewSize, previewSize))
-	for i in xrange(len(permutation)):
-		for j in xrange(len(permutation[i])):
-			x = i * imgWidth
-			y = j * imgHeight
-			filename = getImageFilename(prefix, permutation[i][j])
-			print "Getting filename %s:" % filename
-			img = Image.open(filename)
-			img.thumbnail((reducedSize, reducedSize), Image.ANTIALIAS)
-			imgWidth, imgHeight = img.size
-			print('pos {0},{1} size {2},{3}'.format(x, y, imgWidth, imgHeight))
-			result.paste(img, (x, y, x + imgWidth, y + imgHeight))
-	result.crop((0, 0, (imgWidth + 1) * width, (imgHeight + 1) * width))
-	r_i = np.array(result)
-	plt.imshow(r_i)
-	plt.show()
+import image_util
     
 # order pieces according to the ordering given. 
 def order_pieces(pieces, ordering):
@@ -71,7 +38,7 @@ def visualize(prefix, pieces, ordering):
     numRows, numCols = len(pieces), len(pieces[0])
     assert len(ordering) == numRows * numCols
     ordered_pieces = order_pieces(pieces, ordering)
-    mergeAndShowImage("face", ordered_pieces)
+    return image_util.mergeAndShowImage(prefix, ordered_pieces)
 
 # Shuffles pieces and return it with the corresponding ordering.  
 def pieces_shuffle(pieces):
