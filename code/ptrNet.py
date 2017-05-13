@@ -15,10 +15,11 @@ class PointerNetwork(object):
 		# self.inputs, self.seq_lengths = self.get_placeholders(max_len, input_dim) will need this for initial testing
 
 		
-	def get_placeholders(self, max_len, input_dim):
-		inputs = tf.placeholder(tf.float32, [None, max_len, input_dim], name='Encoder_input')
-		seq_lengths = tf.placeholder(tf.int32, [None, ])
-		return inputs, seq_lengths
+	def get_input_placeholders(self):
+		inputs = tf.placeholder(tf.float32, [None, self.max_len, self.input_dim], name='Encoder_input')
+		seq_lengths = tf.placeholder(tf.int32, [None, ], name='seq_input')
+		targets = tf.placeholder(tf.int32, [None, self.max_len], name="targets")
+		return inputs, seq_lengths, targets
 
 	def encode(self, inputs, seq_lengths):
 		if not self.bidirectional:
@@ -35,38 +36,44 @@ class PointerNetwork(object):
 
 # might need to stop gradients for inputs when doing tests
 # should probably implement glimpses : https://github.com/devsisters/pointer-network-tensorflow/blob/master/layers.py
-	def decode(self, inputs, enc_out, enc_end_state, seq_lengths):
+	def decode(self, inputs, targets, enc_out, enc_end_state, seq_lengths, train=1):
 		# note that here seq_lengths is a numpy array 
 		with vs.variable_scope("decoder_scope") as scope:
-			def attention(hidden, inputs, to_attend, valid_len, scope="Attention"):
-				with vs.variable_scope(scope, reuse=True):
-					att_W_in = vs.get_variable("att_W_in", (self.hidden_dim, self.hidden_dim), self.init)
+
+			def attention(hidden, scope="Attention"):
+				with vs.variable_scope(scope):
+					if hidden is None:
+						return tf.zeros([tf.shape(inputs)[0], self.max_len], tf.float32), tf.zeros([tf.shape(inputs)[0], self.hidden_dim], tf.float32)
+
+					att_W_in = vs.get_variable("att_W_in", (1, self.hidden_dim, self.hidden_dim), self.init)
 					att_W_h  =  vs.get_variable("att_W_h", (self.hidden_dim, self.hidden_dim),  self.init)
 					att_V = vs.get_variable("att_V", (self.hidden_dim, ), self.init)
-					intermediate = tf.tanh(tf.matmul(enc_out, att_W_in) + tf.matmul(hidden, att_W_h))
-					logits = tf.matmul(intermediate, att_V)
-					activations = tf.softmax(logits)
-					next_input = tf.gather(inputs, tf.argmax(activations))
-					return activations, next_input
 
+					enc_ref = tf.nn.conv1d(enc_out, att_W_in, 1, "VALID", name="intermediate")
+					enc_query = tf.expand_dims(tf.matmul(hidden, att_W_h), 1, name="exp_enc_query")
+					enc_query = tf.tile(enc_query, [1, self.max_len, 1], name = "tiled_enc_query")
+					scores = tf.reduce_sum(att_V*tf.tanh(enc_ref + enc_query), [-1]) # doing the sum of the last dimension as dot product
+					inds = tf.argmax(scores, 1)
+					next_inputs = tf.stop_gradient(tf.gather(inputs, inds))
+					return scores, next_inputs
 
-			decoder_cell = tf.nn.rnn_cell.LSTMCell(hidden_dim, initializer = self.init) # switch if too slow to dynamic_rnn_cell #seq2seq decoder
-			outputs = []
-			batch_size = inputs.get_shape()[0]
-			for i in xrange(batch_size):
-				input_seq = tf.squeeze(tf.gather(inputs, i)) # get input of #timesteps
-				attn_seq = tf.squeeze(tf.gather(enc_out, i))
-				prev_hidden = tf.squeeze(tf.gather(enc_end_state, i))
-				prev_in = tf.zeros((1, self.input_dim), dtype=tf.float32, name="decoder_starter")
-				for j in xrange(seq_lengths[i] + 1):
-					if j > 0:
-                		vs.get_variable_scope().reuse_variables()
-					prev_hidden = decoder_cell(prev_in, prev_hidden)
-					out, prev_in = attention(prev_hidden, inputs, attn_seq, seq_lengths[i])
-					outputs.append(out)
+				decoder_cell = tf.nn.rnn_cell.LSTMCell(hidden_dim, initializer = self.init)
+				if train:
+					decoder_fn = tf.contrib.seq2seq.simple_decoder_fn_train(enc_end_state, scope=scope)
+				else:
+					def decoder_fn(time, cell_state, cell_input, cell_output, context_state):
+						cell_output, next_input = attention(cell_output)
+						if cell_state is None:
+							cell_state = enc_end_state
+							next_input = cell_input
+							done = tf.zeros([tf.shape(inputs)[0], ], dtype=tf.bool)
+						done = tf.cond(tf.greater(time, maximum_length), lambda: tf.ones([tf.shape(inputs)[0],], dtype=tf.bool), lambda: done)
+						return done, cell_state, next_input, cell_output, context_state
 
-		return tf.stack(outputs)
+				outputs, final_state, final_context_state = tf.contrib.seq2seq.dynamic_rnn_decoder(decoder_cell, \
+					decoder_fn, inputs, sequence_length = seq_lengths, scope=scope)
 
+		return outputs, final_state, final_context_state
 
 
 
