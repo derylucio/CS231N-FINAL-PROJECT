@@ -39,7 +39,7 @@ class PointerNetwork(object):
 	def decode(self, inputs, targets, enc_out, enc_end_state, seq_lengths, train=1):
 		# note that here seq_lengths is a numpy array 
 		with vs.variable_scope("decoder_scope") as scope:
-
+			maximum_length = tf.convert_to_tensor(self.max_len, tf.int32)
 			def attention(hidden, scope="Attention"):
 				with vs.variable_scope(scope):
 					if hidden is None:
@@ -57,21 +57,21 @@ class PointerNetwork(object):
 					next_inputs = tf.stop_gradient(tf.gather(inputs, inds))
 					return scores, next_inputs
 
-				decoder_cell = tf.nn.rnn_cell.LSTMCell(hidden_dim, initializer = self.init)
-				if train:
-					decoder_fn = tf.contrib.seq2seq.simple_decoder_fn_train(enc_end_state, scope=scope)
-				else:
-					def decoder_fn(time, cell_state, cell_input, cell_output, context_state):
-						cell_output, next_input = attention(cell_output)
-						if cell_state is None:
-							cell_state = enc_end_state
-							next_input = cell_input
-							done = tf.zeros([tf.shape(inputs)[0], ], dtype=tf.bool)
-						done = tf.cond(tf.greater(time, maximum_length), lambda: tf.ones([tf.shape(inputs)[0],], dtype=tf.bool), lambda: done)
-						return done, cell_state, next_input, cell_output, context_state
+			decoder_cell = tf.nn.rnn_cell.LSTMCell(hidden_dim, initializer = self.init)
+			if train:
+				decoder_fn = tf.contrib.seq2seq.simple_decoder_fn_train(enc_end_state, scope=scope)
+			else:
+				def decoder_fn(time, cell_state, cell_input, cell_output, context_state):
+					cell_output, next_input = attention(cell_output)
+					if cell_state is None:
+						cell_state = enc_end_state
+						next_input = cell_input
+						done = tf.zeros([tf.shape(inputs)[0], ], dtype=tf.bool)
+					done = tf.cond(tf.greater(time, maximum_length), lambda: tf.ones([tf.shape(inputs)[0],], dtype=tf.bool), lambda: done)
+					return done, cell_state, next_input, cell_output, context_state
 
-				outputs, final_state, final_context_state = tf.contrib.seq2seq.dynamic_rnn_decoder(decoder_cell, \
-					decoder_fn, inputs, sequence_length = seq_lengths, scope=scope)
+			outputs, final_state, final_context_state = tf.contrib.seq2seq.dynamic_rnn_decoder(decoder_cell, \
+				decoder_fn, inputs, sequence_length = seq_lengths, scope=scope)
 
 		return outputs, final_state, final_context_state
 

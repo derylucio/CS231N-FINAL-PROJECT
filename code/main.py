@@ -50,7 +50,7 @@ def buildModel(options):
 
 def train(data, options):
 	model_str = model_string(options)
-	x_train, y_train, train_seq_lens = data['train']
+	x_train, y_train, train_seq_lens = data['train'] 
 	x_val , y_val, val_seq_lens  = data["val"]
 
 	init = tf.global_varialbles_initializer()
@@ -77,13 +77,13 @@ def train(data, options):
 			for i in xrange(num_batches):
 				curr_iter = (epoch * num_batches + i)
 
-				feed_dict = {input_x : x_train[i], input_y : x_train[i]}
+				feed_dict = {input_x : x_train[i], input_y : y_train[i]}
 				summary, loss, _ = sess.run([merged, loss, train_op], feed_dict = feed_dict)
 				train_writer.add_summary(summary, curr_iter)
 				if curr_iter % options.iter_per_chkpt == 0:
 					saver.save(sess, options.ckpt_dir + "/" + model_str + "/model.ckpt")
 
-				feed_dict = {input_x : x_val[i], input_y : x_val[i]}
+				feed_dict = {input_x : x_val[i], input_y : y_val[i]}
 				summary, val_loss = sess.run([merged, loss], feed_dict = feed_dict)
 				test_writer.add_summary(summary, curr_iter)
 
