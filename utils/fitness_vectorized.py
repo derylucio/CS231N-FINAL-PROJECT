@@ -30,7 +30,7 @@ def splitImage(numRows, numCols, image, piece_dims=(32,32,3)):
     """
     piece_height, piece_width, piece_depth = piece_dims
     large_width, large_height, large_depth = numRows * piece_height, numCols * piece_width, piece_depth
-    # resized_img = np.array(scipy.misc.imresize(image, (width, height, depth), interp='nearest'))
+    # resized_img = np.array(scipy.misc.imresize(image, (large_width, large_height, large_depth), interp='nearest'))
     resized_img = np.array(resize(image, (large_width, large_height, large_depth), 
                             preserve_range=True, mode='reflect')).astype(dtype=np.uint8)
     hsplits = np.array(np.split(resized_img, piece_width * np.arange(1, numCols), axis=1))

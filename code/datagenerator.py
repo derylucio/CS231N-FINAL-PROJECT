@@ -13,7 +13,7 @@ NUM_TEST = 20
 NUM_TRAIN = 80
 NUM_VAL = 20
 NUM_DATA = NUM_TEST + NUM_TRAIN + NUM_VAL
-DIMS=(32,32,3)
+DIMS=(100,100,3)
 
 numRows, numCols = (3, 3)
 
@@ -27,7 +27,6 @@ def getData(puzzle_height, puzzle_width, batch_size=-1):
 							# x_train = [batch1, batch2, ... batchn] - each batch should be the image
 							# seq_len = [batch_size, ] # for each image in that batch, the number of pieces it is cut int
 	'''
-	# TODO: Verify what puzzle_height, puzzle_width are.
 	X_flat = generateImageData(NUM_DATA, puzzle_height, puzzle_width, dims=DIMS)
 	data = prepareDataset(X_flat)
 	return data
@@ -56,7 +55,7 @@ def prepareDataset(X_flat):
 	print("Prepared Flattened Dataset!")
 	X_train = X_train.reshape(NUM_TRAIN, L, -1)
 	X_val = X_val.reshape(NUM_VAL, L, -1)
-	X_test = X_train.reshape(NUM_TEST, L, -1)
+	X_test = X_test.reshape(NUM_TEST, L, -1)
 
 	# Create one-hot vectors of these arrays. 
 	y_train_onehot = np.where(y_train[:,:,np.newaxis] == np.arange(L), 1, 0)
@@ -82,15 +81,17 @@ def generateImageData(N, H, W, dims=(32,32,3)):
 	print("Loaded %d images from %s." % (len(imgList), DATA_DIR))
 
 	print("Augmenting images by flipping.")
-	imgListFlipped = [np.fliplr(img) for img in imgList] # Expensive. 
+	imgListFlipped = [img.copy() for img in imgList]
+	# imgListFlipped = [np.fliplr(img) for img in imgList] # Expensive. 
 	print("Flipped %d images from %s." % (len(imgListFlipped), DATA_DIR))
 	imgList.extend(imgListFlipped)
 
 	X_arr = []
 	for i, img in enumerate(imgList):
-		# Tricky
-		np.add(img, np.mean(img), out=img, casting="unsafe")
-		np.divide(img, np.std(img), out=img, casting="unsafe") 
+		# TODO: Check this to confirm it's good. 
+		img = img.astype(dtype=np.float64)
+		# np.subtract(img, np.mean(img), out=img, casting="safe")
+		# np.divide(img, np.std(img), out=img, casting="safe") 
 		X_arr.append(np.array(fv.splitImage(H, W, img, dims)))
 	print("Generated Data!")
 	return np.array(X_arr, dtype=float)
@@ -113,7 +114,7 @@ def reassemble(data, numRows, numCols):
 	xs = [X_train0, X_test0, X_val0]
 	ys = [y_train0, y_test0, y_val0]
 
-	for i in np.arange(3):
+	for i in np.arange(1):
 		x, y = xs[i], ys[i]
 		plt.figure(i)
 		gs = gridspec.GridSpec(numRows, numCols)
@@ -122,15 +123,18 @@ def reassemble(data, numRows, numCols):
 
 		# Print Train Image
 		for i in np.arange(len(x)):
+			assert(sum(y[i]) == 1)
 			idx = np.where(y[i] == 1)[0]
-			img = x[idx][0,:].reshape(DIMS)
-			print x[idx]
-			ax[i].axis('off')
-			ax[i].imshow(img)
-			ax[i].set_aspect('equal')
+			print i, idx
+			img = x[i].reshape(DIMS)
+			ax[int(idx)].axis('off')
+			ax[int(idx)].imshow(img)
+			ax[int(idx)].set_aspect('equal')
 	
 	plt.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0)
 	plt.show()
+	# sleep(100)
+	# quit()
 
 # TEST
 print("========= TESTING ==========")
@@ -141,5 +145,5 @@ numRows, numCols = 3, 3
 data = getData(numRows, numCols) 
 for n, d in data.items():
 	print n, d.shape
-# reassemble(data, numRows, numCols)
+reassemble(data, numRows, numCols)
 print("========= ALL TESTS PASS =======")
