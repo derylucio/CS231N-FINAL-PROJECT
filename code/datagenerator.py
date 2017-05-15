@@ -13,6 +13,8 @@ NUM_TEST = 20
 NUM_TRAIN = 80
 NUM_VAL = 20
 NUM_DATA = NUM_TEST + NUM_TRAIN + NUM_VAL
+DIMS=(32,32,3)
+
 numRows, numCols = (3, 3)
 
 DATA_DIR = "../data"
@@ -26,38 +28,48 @@ def getData(puzzle_height, puzzle_width, batch_size=-1):
 							# seq_len = [batch_size, ] # for each image in that batch, the number of pieces it is cut int
 	'''
 	# TODO: Verify what puzzle_height, puzzle_width are.
-	X_flat = generateImageData(NUM_DATA, puzzle_height, puzzle_width)
-	data = prepareDataset(X_flat, NUM_TRAIN, NUM_TEST, NUM_VAL)
+	X_flat = generateImageData(NUM_DATA, puzzle_height, puzzle_width, dims=DIMS)
+	data = prepareDataset(X_flat)
 	return data
 
-def prepareDataset(X_flat, num_train, num_test, num_val):
+def prepareDataset(X_flat):
 	'''
 	Splits and preprocessed dimension-formatted data into 
 	train, test and validation data. 
 	Returns:
 	'''
 	print("Preparing Dataset...")
-	N, S, W, H, C = X_flat.shape
+	print(X_flat.shape)
+	N, L, W, H, C = X_flat.shape
 	xs = np.empty_like(X_flat)
-	ys = np.zeros((N, S), dtype=np.uint8)
-	ys += np.arange(S, dtype=np.uint8)
+	ys = np.zeros((N, L), dtype=np.uint8)
+	ys += np.arange(L, dtype=np.uint8)
 
 	np.random.shuffle(X_flat)
 	for i in np.arange(X_flat.shape[0]):
 		np.random.shuffle(ys[i])
 		xs[i,:] = X_flat[i,ys[i]]
 
-	X_train, X_val, X_test = np.split(xs, [num_train, num_train + num_val])
-	y_train, y_val, y_test = np.split(ys, [num_train, num_train + num_val])
-	print("Prepared Dataset!")
+	X_train, X_val, X_test = np.split(xs, [NUM_TRAIN, NUM_TRAIN + NUM_VAL])
+	y_train, y_val, y_test = np.split(ys, [NUM_TRAIN, NUM_TRAIN + NUM_VAL])
+
+	print("Prepared Flattened Dataset!")
+	X_train = X_train.reshape(NUM_TRAIN, L, -1)
+	X_val = X_val.reshape(NUM_VAL, L, -1)
+	X_test = X_train.reshape(NUM_TEST, L, -1)
+
+	# Create one-hot vectors of these arrays. 
+	y_train_onehot = np.where(y_train[:,:,np.newaxis] == np.arange(L), 1, 0)
+	y_val_onehot = np.where(y_val[:,:,np.newaxis] == np.arange(L), 1, 0)  
+	y_test_onehot = np.where(y_test[:,:,np.newaxis] == np.arange(L), 1, 0)  
+
 	return {
-      'X_train': X_train, 'y_train': y_train,
-      'X_val': X_val, 'y_val': y_val,
-      'X_test': X_test, 'y_test': y_test,
+      'X_train': X_train, 'y_train': y_train_onehot,
+      'X_val': X_val, 'y_val': y_val_onehot,
+      'X_test': X_test, 'y_test': y_test_onehot,
     }
 
-
-def generateImageData(N, H, W, dims=(100,100,3)):
+def generateImageData(N, H, W, dims=(32,32,3)):
 	'''
 	Prepares images from the data dir and returns an N*W*H*C numpy array.
 	TODO: Add more transformations.   
@@ -66,6 +78,7 @@ def generateImageData(N, H, W, dims=(100,100,3)):
 	imgList = []
 	for imgName in sorted(os.listdir(DATA_DIR)):
 		imgList.append(scipy.ndimage.imread(DATA_DIR + os.sep + imgName)) 
+		# if len(imgList) > 1: break
 	print("Loaded %d images from %s." % (len(imgList), DATA_DIR))
 
 	print("Augmenting images by flipping.")
@@ -75,9 +88,9 @@ def generateImageData(N, H, W, dims=(100,100,3)):
 
 	X_arr = []
 	for i, img in enumerate(imgList):
-		img.astype(dtype=np.uint8)
-		img -= np.mean(img)
-		img /= np.std(img)
+		# Tricky
+		np.add(img, np.mean(img), out=img, casting="unsafe")
+		np.divide(img, np.std(img), out=img, casting="unsafe") 
 		X_arr.append(np.array(fv.splitImage(H, W, img, dims)))
 	print("Generated Data!")
 	return np.array(X_arr, dtype=float)
@@ -97,7 +110,6 @@ def reassemble(data, numRows, numCols):
 	X_val0 = data['X_val'][val_idx]
 	y_val0 = data['y_val'][val_idx]
 
-
 	xs = [X_train0, X_test0, X_val0]
 	ys = [y_train0, y_test0, y_val0]
 
@@ -110,8 +122,8 @@ def reassemble(data, numRows, numCols):
 
 		# Print Train Image
 		for i in np.arange(len(x)):
-			idx = np.where(y == i)[0]
-			img = x[idx][0,:]
+			idx = np.where(y[i] == 1)[0]
+			img = x[idx][0,:].reshape(DIMS)
 			print x[idx]
 			ax[i].axis('off')
 			ax[i].imshow(img)
@@ -123,6 +135,11 @@ def reassemble(data, numRows, numCols):
 # TEST
 print("========= TESTING ==========")
 numRows, numCols = 3, 3
-data = getData(numRows, numCols).copy()
-reassemble(data, numRows, numCols)
+# data = getData(numRows, numCols, False) 
+# reassemble(data, numRows, numCols)
+
+data = getData(numRows, numCols) 
+for n, d in data.items():
+	print n, d.shape
+# reassemble(data, numRows, numCols)
 print("========= ALL TESTS PASS =======")
