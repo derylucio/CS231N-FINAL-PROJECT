@@ -81,8 +81,7 @@ def generateImageData(N, H, W, dims=(32,32,3)):
 	print("Loaded %d images from %s." % (len(imgList), DATA_DIR))
 
 	print("Augmenting images by flipping.")
-	imgListFlipped = [img.copy() for img in imgList]
-	# imgListFlipped = [np.fliplr(img) for img in imgList] # Expensive. 
+	imgListFlipped = [np.fliplr(img) for img in imgList] # Expensive. 
 	print("Flipped %d images from %s." % (len(imgListFlipped), DATA_DIR))
 	imgList.extend(imgListFlipped)
 
@@ -90,15 +89,14 @@ def generateImageData(N, H, W, dims=(32,32,3)):
 	for i, img in enumerate(imgList):
 		# TODO: Check this to confirm it's good. 
 		img = img.astype(dtype=np.float64)
-		# np.subtract(img, np.mean(img), out=img, casting="safe")
-		# np.divide(img, np.std(img), out=img, casting="safe") 
+		np.subtract(img, np.mean(img), out=img, casting="safe")
+		np.divide(img, np.std(img), out=img, casting="safe") 
 		X_arr.append(np.array(fv.splitImage(H, W, img, dims)))
 	print("Generated Data!")
 	return np.array(X_arr, dtype=float)
 
 def reassemble(data, numRows, numCols):
 	print("Reassembling...")
-	# Choose random val for train, test and val
 	train_idx = np.random.randint(NUM_TRAIN)
 	X_train0 = data['X_train'][train_idx]
 	y_train0 = data['y_train'][train_idx]
@@ -114,14 +112,13 @@ def reassemble(data, numRows, numCols):
 	xs = [X_train0, X_test0, X_val0]
 	ys = [y_train0, y_test0, y_val0]
 
-	for i in np.arange(1):
+	for i in np.arange(3):
 		x, y = xs[i], ys[i]
 		plt.figure(i)
 		gs = gridspec.GridSpec(numRows, numCols)
 		gs.update(wspace=0.0, hspace=0.0)
 		ax = [plt.subplot(gs[i]) for i in np.arange(numRows * numCols)]
 
-		# Print Train Image
 		for i in np.arange(len(x)):
 			assert(sum(y[i]) == 1)
 			idx = np.where(y[i] == 1)[0]
@@ -133,15 +130,9 @@ def reassemble(data, numRows, numCols):
 	
 	plt.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0)
 	plt.show()
-	# sleep(100)
-	# quit()
 
 # TEST
 print("========= TESTING ==========")
-numRows, numCols = 3, 3
-# data = getData(numRows, numCols, False) 
-# reassemble(data, numRows, numCols)
-
 data = getData(numRows, numCols) 
 for n, d in data.items():
 	print n, d.shape
