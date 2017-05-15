@@ -1,5 +1,7 @@
 import numpy as np
 import scipy.misc
+from numpy import array
+from skimage.transform import resize
 
 def fitnessScore(piece1, piece2, orientation):
     """ 
@@ -27,9 +29,10 @@ def splitImage(numRows, numCols, image, piece_dims=(32,32,3)):
     Splits along vertical and horizontal axis.
     """
     piece_height, piece_width, piece_depth = piece_dims
-    resized_img = np.array(scipy.misc.imresize(image,
-                            (numRows * piece_height, numCols * piece_width, piece_depth),
-                            interp='nearest'))
+    large_width, large_height, large_depth = numRows * piece_height, numCols * piece_width, piece_depth
+    # resized_img = np.array(scipy.misc.imresize(image, (width, height, depth), interp='nearest'))
+    resized_img = np.array(resize(image, (large_width, large_height, large_depth), 
+                            preserve_range=True, mode='reflect')).astype(dtype=np.uint8)
     hsplits = np.array(np.split(resized_img, piece_width * np.arange(1, numCols), axis=1))
     vsplits = np.array(np.split(hsplits, piece_height * np.arange(1, numRows), axis=1)) # Not 1 since we introduce one more dim.
     split_images = vsplits.reshape(-1, *piece_dims)
@@ -78,9 +81,12 @@ assert(fitnessScore(p1, p2, "D") > 0)
 
 ## Split Image ##
 # TODO: Add to this.
+img = np.arange(24).reshape(4, 2, 3)
+imgs = splitImage(4, 2, img, piece_dims=(1,1,3))
+assert(imgs.shape == (8, 1, 1, 3))
+assert(np.mean(imgs) - np.mean(img) < 0.5)
 
 # Standard Usage
 img = 255 * np.random.rand(128, 128, 3)
 imgs = splitImage(2, 2, img, piece_dims=(32, 32, 3))
-assert(imgs.shape == (4, 32, 32, 3))                                                                                                                                                                                                                                                                                                                                                                                                                                                            53,47          All
-
+assert(imgs.shape == (4, 32, 32, 3))
