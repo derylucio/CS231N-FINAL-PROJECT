@@ -65,27 +65,22 @@ def generateImageData(N, H, W, dims=(100,100,3)):
 	print("Generating Image Data...")
 	imgList = []
 	for imgName in sorted(os.listdir(DATA_DIR)):
-		imgList.append(scipy.ndimage.imread(DATA_DIR + os.sep + imgName)) # W, H, C
-		# if (len(imgList) > 1): break
+		imgList.append(scipy.ndimage.imread(DATA_DIR + os.sep + imgName)) 
 	print("Loaded %d images from %s." % (len(imgList), DATA_DIR))
+
 	print("Augmenting images by flipping.")
 	imgListFlipped = [np.fliplr(img) for img in imgList] # Expensive. 
 	print("Flipped %d images from %s." % (len(imgListFlipped), DATA_DIR))
 	imgList.extend(imgListFlipped)
 
-	X = np.array(imgList[:N]).astype(dtype=float)
-
-	# TODO: Check this. How Numpy works with different varying sized arrays. 
-	# X -= np.mean(X, axis=0)
-	# X /= np.std(X, axis=0)
-
-	X_arr = [] # np.zeros([NUM_DATA, H * W, 32, 32, 3])
+	X_arr = []
 	for i, img in enumerate(imgList):
+		img.astype(dtype=np.uint8)
+		img -= np.mean(img)
+		img /= np.std(img)
 		X_arr.append(np.array(fv.splitImage(H, W, img, dims)))
-	assert(np.linalg.norm(X_arr[0]) > 0)
 	print("Generated Data!")
-	print(np.array(X_arr).shape)
-	return np.array(X_arr)
+	return np.array(X_arr, dtype=float)
 
 def reassemble(data, numRows, numCols):
 	print("Reassembling...")
@@ -93,25 +88,35 @@ def reassemble(data, numRows, numCols):
 	train_idx = np.random.randint(NUM_TRAIN)
 	X_train0 = data['X_train'][train_idx]
 	y_train0 = data['y_train'][train_idx]
+
 	test_idx = np.random.randint(NUM_TEST)
 	X_test0 = data['X_test'][test_idx]
 	y_test0 = data['y_test'][test_idx]
+
 	val_idx = np.random.randint(NUM_VAL)
 	X_val0 = data['X_val'][val_idx]
 	y_val0 = data['y_val'][val_idx]
 
-	gs = gridspec.GridSpec(numRows, numCols)
-	gs.update(wspace=0.0, hspace=0.0)
-	ax = [plt.subplot(gs[i]) for i in np.arange(numRows * numCols)]
 
-	# Print Train Image
-	for i in np.arange(len(X_train)):
-		idx = np.where(y == i)[0]
-		img = x[idx][0,:]
-		print x[idx]
-		ax[i].axis('off')
-		ax[i].imshow(img)
-		ax[i].set_aspect('equal')
+	xs = [X_train0, X_test0, X_val0]
+	ys = [y_train0, y_test0, y_val0]
+
+	for i in np.arange(3):
+		x, y = xs[i], ys[i]
+		plt.figure(i)
+		gs = gridspec.GridSpec(numRows, numCols)
+		gs.update(wspace=0.0, hspace=0.0)
+		ax = [plt.subplot(gs[i]) for i in np.arange(numRows * numCols)]
+
+		# Print Train Image
+		for i in np.arange(len(x)):
+			idx = np.where(y == i)[0]
+			img = x[idx][0,:]
+			print x[idx]
+			ax[i].axis('off')
+			ax[i].imshow(img)
+			ax[i].set_aspect('equal')
+	
 	plt.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0)
 	plt.show()
 
