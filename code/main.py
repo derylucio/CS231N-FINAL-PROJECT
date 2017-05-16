@@ -5,7 +5,6 @@ from ptrNet import PointerNetwork
 import tensorflow as tf
 # TODO: Trainable initial state might be needed
 # TODO: Implement glimpses
-# TODO: Fix bidirectional aspect! 
 def getOptimizer(options):
 	lr = options.lr  # might want to do more complicated things 
 	if options.optim == "Adam":
@@ -117,7 +116,7 @@ if __name__ == "__main__":
 	parser.add_option("--epochs", type=int, dest="nb_epoch", default=200)
 	parser.add_option("--lr", type=float, dest="lr", default=1e-1)
 	parser.add_option("--optim", type=str, dest="optim", default="Adam")
-	parser.add_option("--bidirect", action="store_true", dest="bidirectional", default=False)
+	parser.add_option("--bidirect", action="store_true", dest="bidirectional", default=True)
 	parser.add_option("--puzzle_width", type=int, dest="puzzle_width", default=2)
 	parser.add_option("--puzzle_height", type=int, dest="puzzle_height", default=2)
 	parser.add_option("--log_dir", type=str, dest="log_dir", default="logs")

@@ -28,18 +28,17 @@ class PointerNetwork(object):
 			cell = tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
 			output, output_state = tf.nn.dynamic_rnn(cell, inputs, sequence_length=seq_lengths, dtype=tf.float32)
 		else:
-			# TODO: Not working ! Need to fix
 			cell_fw =  tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
 			cell_bw =  tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
 			output_fw_bw, output_states = tf.nn.bidirectional_dynamic_rnn(cell_fw, cell_bw, inputs , sequence_length=seq_lengths, dtype=tf.float32)
+
 			fw, bw = tf.unstack(output_fw_bw, axis=0)
 			output = fw + bw # assuming we are just summing the forward and backwared activations
 			fw_state, bw_state = tf.unstack(output_states, axis=0)
-			_, fw_state = tf.unstack(fw_state, axis = 0)
-			_, bw_state = tf.unstack(bw_state, axis = 0)
-			output_state = fw_state + bw_state
+			c_fw, h_fw = tf.unstack(fw_state, axis = 0)
+			c_bw, h_bw = tf.unstack(bw_state, axis = 0)
+			output_state = tf.contrib.rnn.core_rnn_cell.LSTMStateTuple(c_fw + c_bw, h_fw + h_bw)
 
-		print output, '\n', output_state, '\n'
 		return output, output_state
 
 # might need to stop gradients for inputs when doing tests
@@ -76,10 +75,7 @@ class PointerNetwork(object):
 	        attn_length = tf.shape(enc_out)[1]
 	        attn_size = tf.shape(enc_out)[2]
 	        outputs = []
-	        # batch_attn_size = array_ops.pack([batch_size, attn_size])
-	        # attns = array_ops.zeros(batch_attn_size, dtype=tf.float32)
 
-	        # attns.set_shape([None, attn_size])
 	        states = [enc_end_state]
 	        inp = tf.zeros([tf.shape(enc_out)[0], self.input_dim], tf.float32)
 	        inputs = tf.transpose(inputs, [1, 0, 2])
