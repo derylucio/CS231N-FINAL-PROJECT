@@ -19,7 +19,7 @@ numRows, numCols = (3, 3)
 
 DATA_DIR = "../data"
 
-def getData(puzzle_height, puzzle_width, batch_size=-1):
+def getData(puzzle_height, puzzle_width, batch_size):
 	'''
 	returns data : such that data['val'] = (x_val, y_val, val_seq_len)
 							data['train'] = (x_train, y_train, train_seq_len)
@@ -62,9 +62,13 @@ def prepareDataset(X_flat):
 	y_val_onehot = np.where(y_val[:,:,np.newaxis] == np.arange(L), 1, 0)  
 	y_test_onehot = np.where(y_test[:,:,np.newaxis] == np.arange(L), 1, 0)  
 
+	train_seq = np.full((len(X_train)), L, dtype=np.uint8), 
+	val_seq = np.full((len(X_val)), L, dtype=np.uint8) 
+	test_seq = np.full((len(X_test)), L, dtype=np.uint8)
+
 	return {
       'train': (X_train, y_train_onehot, train_seq),  
-      'val'  : (X_val, y_val_onehot, val_seq), X_val,  
+      'val'  : (X_val, y_val_onehot, val_seq), 
       'test' : (X_test, y_test_onehot, test_seq)
     }
 
@@ -97,17 +101,21 @@ def generateImageData(N, H, W, dims=(32,32,3)):
 
 def reassemble(data, numRows, numCols):
 	print("Reassembling...")
+	X_train, y_train, _ = data['train']
+	X_val, y_val, _ = data['val']
+	X_test, y_test, _ = data['test']
+
 	train_idx = np.random.randint(NUM_TRAIN)
-	X_train0 = data['X_train'][train_idx]
-	y_train0 = data['y_train'][train_idx]
+	X_train0 = X_train[train_idx]
+	y_train0 = y_train[train_idx]
 
 	test_idx = np.random.randint(NUM_TEST)
-	X_test0 = data['X_test'][test_idx]
-	y_test0 = data['y_test'][test_idx]
+	X_test0 = X_test[test_idx]
+	y_test0 = y_test[test_idx]
 
 	val_idx = np.random.randint(NUM_VAL)
-	X_val0 = data['X_val'][val_idx]
-	y_val0 = data['y_val'][val_idx]
+	X_val0 = X_val[val_idx]
+	y_val0 = y_val[val_idx]
 
 	xs = [X_train0, X_test0, X_val0]
 	ys = [y_train0, y_test0, y_val0]
