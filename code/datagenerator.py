@@ -63,9 +63,9 @@ def prepareDataset(X_flat):
 	y_test_onehot = np.where(y_test[:,:,np.newaxis] == np.arange(L), 1, 0)  
 
 	return {
-      'X_train': X_train, 'y_train': y_train_onehot,
-      'X_val': X_val, 'y_val': y_val_onehot,
-      'X_test': X_test, 'y_test': y_test_onehot,
+      'train': (X_train, y_train_onehot, train_seq),  
+      'val'  : (X_val, y_val_onehot, val_seq), X_val,  
+      'test' : (X_test, y_test_onehot, test_seq)
     }
 
 def generateImageData(N, H, W, dims=(32,32,3)):
