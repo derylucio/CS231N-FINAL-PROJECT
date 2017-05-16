@@ -29,12 +29,17 @@ class PointerNetwork(object):
 			output, output_state = tf.nn.dynamic_rnn(cell, inputs, sequence_length=seq_lengths, dtype=tf.float32)
 		else:
 			# TODO: Not working ! Need to fix
-			cell_fw =  tf.contrib.rnn_cell.LSTMCell(self.hidden_dim, initializer = self.init)
-			cell_bw =  tf.contrib.rnn_cell.LSTMCell(self.hidden_dim, initializer = self.init)
-			output_fw_bw, output_states = tf.contrib.bidirectional_dynamic_rnn(cell_fw, cell_bw, inputs , sequence_length=seq_lengths, dtype=tf.float32)
-			output = tf.add(output_fw_bw[0], output_fw_bw[1]) # assuming we are just summing the forward and backwared activations
-			output_state = tf.add(output_states[0], output_states[1])
+			cell_fw =  tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
+			cell_bw =  tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
+			output_fw_bw, output_states = tf.nn.bidirectional_dynamic_rnn(cell_fw, cell_bw, inputs , sequence_length=seq_lengths, dtype=tf.float32)
+			fw, bw = tf.unstack(output_fw_bw, axis=0)
+			output = fw + bw # assuming we are just summing the forward and backwared activations
+			fw_state, bw_state = tf.unstack(output_states, axis=0)
+			_, fw_state = tf.unstack(fw_state, axis = 0)
+			_, bw_state = tf.unstack(bw_state, axis = 0)
+			output_state = fw_state + bw_state
 
+		print output, '\n', output_state, '\n'
 		return output, output_state
 
 # might need to stop gradients for inputs when doing tests
