@@ -22,7 +22,7 @@ numRows, numCols = (3, 3)
 DATA_DIR = "../data"
 
 
-def getData(puzzle_height, puzzle_width, batch_size=-1, keep_dims = False):
+def getData(puzzle_height, puzzle_width, batch_size=-1):
 	'''
 	returns data : such that data['val'] = (x_val, y_val, val_seq_len)
 							data['train'] = (x_train, y_train, train_seq_len)
@@ -30,11 +30,11 @@ def getData(puzzle_height, puzzle_width, batch_size=-1, keep_dims = False):
 							# x_train = [batch1, batch2, ... batchn] - each batch should be the image
 							# seq_len = [batch_size, ] # for each image in that batch, the number of pieces it is cut int
 	'''
-	X_flat = generateImageData(NUM_DATA, puzzle_height, puzzle_width, dims=DIMS, keep_dims=keep_dims)
-	data = prepareDataset(X_flat, keep_dims=keep_dims)
+	X_flat = generateImageData(NUM_DATA, puzzle_height, puzzle_width, dims=DIMS)
+	data = prepareDataset(X_flat)
 	return data
 
-def prepareDataset(X_flat, keep_dims=False):
+def prepareDataset(X_flat):
 	'''
 	Splits and preprocessed dimension-formatted data into 
 	train, test and validation data. 
@@ -56,11 +56,9 @@ def prepareDataset(X_flat, keep_dims=False):
 	y_train, y_val, y_test = np.split(ys, [NUM_TRAIN, NUM_TRAIN + NUM_VAL])
 
 	print("Prepared Flattened Dataset!")
-	print keep_dims
-	if not keep_dims:
-		X_train = X_train.reshape(NUM_TRAIN, L, -1)
-		X_val = X_val.reshape(NUM_VAL, L, -1)
-		X_test = X_test.reshape(NUM_TEST, L, -1)
+	X_train = X_train.reshape(NUM_TRAIN, L, -1)
+	X_val = X_val.reshape(NUM_VAL, L, -1)
+	X_test = X_test.reshape(NUM_TEST, L, -1)
 
 	# Create one-hot vectors of these arrays. 
 	y_train_onehot = np.where(y_train[:,:,np.newaxis] == np.arange(L), 1, 0)
@@ -78,7 +76,7 @@ def prepareDataset(X_flat, keep_dims=False):
     }
 
 # need to parallelize
-def generateImageData(N, H, W, dims=(32,32,3), keep_dims = False):
+def generateImageData(N, H, W, dims=(32,32,3)):
 	'''
 	Prepares images from the data dir and returns an N*W*H*C numpy array.
 	TODO: Add more transformations.   
