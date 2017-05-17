@@ -11,11 +11,11 @@ from skimage.transform import resize
 sys.path.append('../utils/')
 import fitness_vectorized as fv
 
-NUM_TEST = 20
-NUM_TRAIN = 80
-NUM_VAL = 20
+NUM_TEST = 100
+NUM_TRAIN = 1000
+NUM_VAL = 200
 NUM_DATA = NUM_TEST + NUM_TRAIN + NUM_VAL
-DIMS=(50, 50,3)
+DIMS=(64, 64, 3)
 
 numRows, numCols = (3, 3)
 
@@ -75,6 +75,7 @@ def prepareDataset(X_flat):
       'test' : (X_test, y_test_onehot, test_seq)
     }
 
+# need to parallelize
 def generateImageData(N, H, W, dims=(32,32,3)):
 	'''
 	Prepares images from the data dir and returns an N*W*H*C numpy array.
@@ -84,13 +85,13 @@ def generateImageData(N, H, W, dims=(32,32,3)):
 	imgList = []
 	for imgName in sorted(os.listdir(DATA_DIR)):
 		imgList.append(scipy.ndimage.imread(DATA_DIR + os.sep + imgName)) 
-		# if len(imgList) > 1: break
+		if len(imgList) >= NUM_DATA: break
 	print("Loaded %d images from %s." % (len(imgList), DATA_DIR))
 
-	print("Augmenting images by flipping.")
-	imgListFlipped = [np.fliplr(img) for img in imgList] # Expensive. 
-	print("Flipped %d images from %s." % (len(imgListFlipped), DATA_DIR))
-	imgList.extend(imgListFlipped)
+	# print("Augmenting images by flipping.")
+	# imgListFlipped = [np.fliplr(img) for img in imgList] # Expensive. 
+	# print("Flipped %d images from %s." % (len(imgListFlipped), DATA_DIR))
+	# imgList.extend(imgListFlipped)
 
 	X_arr = []
 	new_list = []
