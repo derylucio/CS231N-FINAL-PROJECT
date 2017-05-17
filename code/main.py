@@ -35,6 +35,7 @@ def model_string(options):
 	return model_str
 
 def buildModel(options):
+	
 	# most probably will have to set up the visual model first but let's make sure that the ptr net works! 
 	ptr_net = PointerNetwork(options.max_len, options.input_dim, options.hidden_dim, options.bidirectional)
 	inputs, seq_lens, targets = ptr_net.get_input_placeholders() # will change this to visual model input once time permits
