@@ -2,19 +2,42 @@ import tensorflow as tf
 # from tensorflow.contrib.layers import variance_scaling_initializer
 from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.ops import array_ops
+from tensorflow.python.util import nest
+
 
 class PointerNetwork(object):
 
-	def __init__(self, max_len, input_dim, hidden_dim, bidirectional):
+	def __init__(self, max_len, input_dim, hidden_dim, bidirectional, fc_dim, batch_size):
 		self.max_len = max_len
 		self.input_dim = input_dim
 		self.bidirectional = bidirectional
 		self.hidden_dim = hidden_dim
 		self.init =  tf.contrib.layers.variance_scaling_initializer()
+		self.fc_dim = fc_dim
+		self.batch_size = batch_size
 		self.decoder_cell = tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
+		self.trainable_init_state = self.trainable_initial_state()
 
 
 		# self.inputs, self.seq_lengths = self.get_placeholders(max_len, input_dim) will need this for initial testing
+
+	def trainable_initial_state(self,  name="initial_state"):
+	  flat_state_size = nest.flatten(self.fc_dim)
+
+	  names = ["{}_{}".format(name, i) for i in xrange(len(flat_state_size))]
+	  tiled_states = []
+
+	  for name, size in zip(names, flat_state_size):
+	    shape_with_batch_dim = [1, size]
+	    initial_state_variable = tf.get_variable(
+	        name, shape=shape_with_batch_dim, initializer = self.init)
+
+	    tiled_state = tf.tile(initial_state_variable,
+	                          [self.batch_size, 1], name=(name + "_tiled"))
+	    tiled_states.append(tiled_state)
+
+	  return nest.pack_sequence_as(structure=self.fc_dim,
+	                               flat_sequence=tiled_states)
 
 		
 	def get_input_placeholders(self):
@@ -23,7 +46,14 @@ class PointerNetwork(object):
 		targets = tf.placeholder(tf.int32, [None, self.max_len, self.max_len], name="targets")
 		return inputs, seq_lengths, targets
 
-	def encode(self, inputs, seq_lengths):
+	def encode(self, orig_inputs, seq_lengths, process='FC'):
+		if process == 'FC':
+			orig_inputs = tf.reshape(orig_inputs, [-1, self.input_dim])
+			inputs = tf.layers.dense(orig_inputs, self.fc_dim, activation=tf.nn.relu, kernel_initializer=self.init)
+			inputs = tf.reshape(inputs, [-1, self.max_len, self.fc_dim])
+		elif process == 'CNN':
+			pass
+
 		if not self.bidirectional:
 			cell = tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
 			output, output_state = tf.nn.dynamic_rnn(cell, inputs, sequence_length=seq_lengths, dtype=tf.float32)
@@ -39,7 +69,7 @@ class PointerNetwork(object):
 			c_bw, h_bw = tf.unstack(bw_state, axis = 0)
 			output_state = tf.contrib.rnn.core_rnn_cell.LSTMStateTuple(c_fw + c_bw, h_fw + h_bw)
 
-		return output, output_state
+		return inputs, output, output_state
 
 # might need to stop gradients for inputs when doing tests
 # should probably implement glimpses : https://github.com/devsisters/pointer-network-tensorflow/blob/master/layers.py
@@ -77,7 +107,7 @@ class PointerNetwork(object):
 	        outputs = []
 
 	        states = [enc_end_state]
-	        inp = tf.zeros([tf.shape(enc_out)[0], self.input_dim], tf.float32)
+	        inp = tf.zeros([tf.shape(enc_out)[0], self.fc_dim], tf.float32)
 	        inputs = tf.transpose(inputs, [1, 0, 2])
 	        for i in xrange(self.max_len):
 	            if i > 0:

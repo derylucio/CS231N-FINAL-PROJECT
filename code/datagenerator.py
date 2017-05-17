@@ -5,6 +5,8 @@ import os
 import sys
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from skimage.transform import resize
+
 
 sys.path.append('../utils/')
 import fitness_vectorized as fv
@@ -13,14 +15,14 @@ NUM_TEST = 20
 NUM_TRAIN = 80
 NUM_VAL = 20
 NUM_DATA = NUM_TEST + NUM_TRAIN + NUM_VAL
-DIMS=(100,100,3)
+DIMS=(50, 50,3)
 
 numRows, numCols = (3, 3)
 
 DATA_DIR = "../data"
 
 
-def getData(puzzle_height, puzzle_width, batch_size):
+def getData(puzzle_height, puzzle_width, batch_size=-1):
 	'''
 	returns data : such that data['val'] = (x_val, y_val, val_seq_len)
 							data['train'] = (x_train, y_train, train_seq_len)
@@ -63,9 +65,9 @@ def prepareDataset(X_flat):
 	y_val_onehot = np.where(y_val[:,:,np.newaxis] == np.arange(L), 1, 0)  
 	y_test_onehot = np.where(y_test[:,:,np.newaxis] == np.arange(L), 1, 0)  
 
-	train_seq = np.full((len(X_train)), L, dtype=np.uint8), 
-	val_seq = np.full((len(X_val)), L, dtype=np.uint8) 
-	test_seq = np.full((len(X_test)), L, dtype=np.uint8)
+	train_seq = np.ones((len(X_train)))*L #np.full((len(X_train)), L, dtype=np.uint8)[0]
+	val_seq = np.ones((len(X_val)))*L #np.full((len(X_val)), L, dtype=np.uint8)[0]
+	test_seq = np.ones((len(X_test)))*L#np.full((len(X_test)), L, dtype=np.uint8)[0]
 
 	return {
       'train': (X_train, y_train_onehot, train_seq),  
@@ -91,11 +93,22 @@ def generateImageData(N, H, W, dims=(32,32,3)):
 	imgList.extend(imgListFlipped)
 
 	X_arr = []
+	new_list = []
+	for i, img in enumerate(imgList):
+		large_width, large_height, large_depth = H * dims[0], W * dims[1], dims[2]
+		resized_img = np.array(resize(img, (large_width, large_height, large_depth), preserve_range=True, mode='reflect'))#.astype(dtype=np.uint8)
+		new_list.append(resized_img)
+
+	imgList = new_list
+	imgList = np.array(imgList)
+	imgList -= np.mean(imgList, axis = 0)
+	# print np.shape(imgList), np.shape(np.std(imgList, axis = 0))
+	imgList /= np.std(imgList, axis = 0)
 	for i, img in enumerate(imgList):
 		# TODO: Check this to confirm it's good. 
 		img = img.astype(dtype=np.float64)
-		np.subtract(img, np.mean(img), out=img, casting="safe")
-		np.divide(img, np.std(img), out=img, casting="safe") 
+		# np.subtract(img, np.mean(img), out=img, casting="safe")
+		# np.divide(img, np.std(img), out=img, casting="safe") 
 		X_arr.append(np.array(fv.splitImage(H, W, img, dims)))
 	print("Generated Data!")
 	return np.array(X_arr, dtype=float)
@@ -141,41 +154,10 @@ def reassemble(data, numRows, numCols):
 	plt.show()
 
 # TEST
-print("========= TESTING ==========")
-data = getData(numRows, numCols) 
-for n, d in data.items():
-	print n, d.shape
-reassemble(data, numRows, numCols)
-print("========= ALL TESTS PASS =======")
-# 							# seq_len = [batch_size, ] # for each image in that batch, the number of pieces it is cut into
-# 	making toy dataset 
-# 	data = {}
-# 	x_train, y_train, train_seq = [], [], []
-# 	for i in range(batch_size):
-# 		perm = np.random.permutation(puzzle_width*puzzle_height)
-# 		x_train.append([[j] for j in perm])
-# 		y = np.zeros((puzzle_width*puzzle_height, puzzle_width*puzzle_height))
-# 		y[range(len(perm)), perm] = 1
-# 		y_train.append(y)
-# 		train_seq.append(puzzle_width*puzzle_height)
-# 	x_train, y_train, train_seq = np.array(x_train), np.array(y_train), np.array(train_seq)
+# print("========= TESTING ==========")
+# data = getData(numRows, numCols) 
+# for n, d in data.items():
+# 	print n, d.shape
+# reassemble(data, numRows, numCols)
+# print("========= ALL TESTS PASS =======")
 
-# 	x_val, y_val, val_seq = [], [], []
-# 	for i in range(batch_size):
-# 		perm = np.random.permutation(puzzle_width*puzzle_height)
-# 		x_val.append([[j] for j in perm])
-# 		y = np.zeros((puzzle_width*puzzle_height, puzzle_width*puzzle_height))
-# 		y[range(len(perm)), perm] = 1
-# 		y_val.append(y)
-# 		val_seq.append(puzzle_width*puzzle_height)
-# 	x_val, y_val, val_seq = np.array(x_val), np.array(y_val), np.array(val_seq)
-
-# 	data['train'] = (x_train, y_train, train_seq)
-# 	data['val'] = (x_val, y_val, val_seq)
-# 	return data
-
-# res = getData(2, 2, 5)
-# res = res['train']
-# print res[2].shape, res[2]
-# print res[1].shape, res[1]
-# print res[0].shape, res[0]
