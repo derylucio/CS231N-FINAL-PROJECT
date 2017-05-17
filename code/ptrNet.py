@@ -1,13 +1,14 @@
 import tensorflow as tf 
-# from tensorflow.contrib.layers import variance_scaling_initializer
+#from tensorflow.contrib.layers import variance_scaling_initializer
 from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.ops import array_ops
 from tensorflow.python.util import nest
+from cnn import CNN_FeatureExtractor
 
 
 class PointerNetwork(object):
 
-	def __init__(self, max_len, input_dim, hidden_dim, bidirectional, fc_dim, batch_size, inter_dim):
+	def __init__(self, max_len, input_dim, hidden_dim, bidirectional, fc_dim, batch_size, inter_dim, img_height = 64, img_width = 64 , img_depth = 3):
 		self.max_len = max_len
 		self.input_dim = input_dim
 		self.bidirectional = bidirectional
@@ -17,38 +18,50 @@ class PointerNetwork(object):
 		self.batch_size = batch_size
 		self.inter_dim = inter_dim
 		self.decoder_cell = tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
+		self.cnn_f_extractor = CNN_FeatureExtractor()
+		self.img_height = img_height
+		self.img_width = img_width 
+		self.img_depth = img_depth
 
 		
-	def get_input_placeholders(self):
-		inputs = tf.placeholder(tf.float32, shape=(None, self.max_len, self.input_dim), name='Encoder_input')
+	def get_input_placeholders(self, use_cnn = True):
+		if not use_cnn:
+			inputs = tf.placeholder(tf.float32, shape=(None, self.max_len, self.input_dim), name='Encoder_input')
+		else:
+			inputs = tf.placeholder(tf.float32, shape=(None, self.max_len, self.img_height, self.img_width, self.img_depth), name='Encoder_input')
 		seq_lengths = tf.placeholder(tf.int32, [None, ], name='seq_input')
 		targets = tf.placeholder(tf.int32, [None, self.max_len, self.max_len], name="targets")
-		return inputs, seq_lengths, targets
+		if not use_cnn:
+			return inputs, seq_lengths, targets
+		else:
+			inpfn = self.cnn_f_extractor.getInputFn()
+			return inputs, seq_lengths, targets, inpfn
 
-	def encode(self, orig_inputs, seq_lengths, process='FC'):
-		with tf.variable_scope('encoder'):
-			if process == 'FC':
-				orig_inputs = tf.reshape(orig_inputs, [-1, self.input_dim])
-				inputs = tf.layers.dense(orig_inputs, self.inter_dim, activation=tf.nn.relu, kernel_initializer=self.init)
-				inputs = tf.layers.dense(inputs, self.fc_dim, activation=tf.nn.relu, kernel_initializer=self.init)
-				inputs = tf.reshape(inputs, [-1, self.max_len, self.fc_dim])
-			elif process == 'CNN':
-				pass
+	def encode(self, orig_inputs, seq_lengths, process='FC', is_training=True):
+		if process == 'FC':
+			orig_inputs = tf.reshape(orig_inputs, [-1, self.input_dim])
+			inputs = tf.layers.dense(orig_inputs, self.inter_dim, activation=tf.nn.relu, kernel_initializer=self.init)
+			inputs = tf.layers.dense(inputs, self.fc_dim, activation=tf.nn.relu, kernel_initializer=self.init)
+			inputs = tf.reshape(inputs, [-1, self.max_len, self.fc_dim])
+		elif process == 'CNN':
+			orig_inputs = tf.reshape(orig_inputs, [-1, self.img_height, self.img_width, self.img_depth])
+			features = self.cnn_f_extractor.CNNFeatureExtractor(orig_inputs, self.img_height, self.img_width, is_training)
+			inputs = tf.reshape(features, [-1, self.max_len, self.fc_dim])
 
-			if not self.bidirectional:
-				cell = tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
-				output, output_state = tf.nn.dynamic_rnn(cell, inputs, sequence_length=seq_lengths, dtype=tf.float32)
-			else:
-				cell_fw =  tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
-				cell_bw =  tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
-				output_fw_bw, output_states = tf.nn.bidirectional_dynamic_rnn(cell_fw, cell_bw, inputs , sequence_length=seq_lengths, dtype=tf.float32)
+		if not self.bidirectional:
+			cell = tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
+			output, output_state = tf.nn.dynamic_rnn(cell, inputs, sequence_length=seq_lengths, dtype=tf.float32)
+		else:
+			cell_fw =  tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
+			cell_bw =  tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
+			output_fw_bw, output_states = tf.nn.bidirectional_dynamic_rnn(cell_fw, cell_bw, inputs , sequence_length=seq_lengths, dtype=tf.float32)
 
-				fw, bw = tf.unstack(output_fw_bw, axis=0)
-				output = fw + bw # assuming we are just summing the forward and backwared activations
-				fw_state, bw_state = tf.unstack(output_states, axis=0)
-				c_fw, h_fw = tf.unstack(fw_state, axis = 0)
-				c_bw, h_bw = tf.unstack(bw_state, axis = 0)
-				output_state = tf.contrib.rnn.core_rnn_cell.LSTMStateTuple(c_fw + c_bw, h_fw + h_bw)
+			fw, bw = tf.unstack(output_fw_bw, axis=0)
+			output = fw + bw # assuming we are just summing the forward and backwared activations
+			fw_state, bw_state = tf.unstack(output_states, axis=0)
+			c_fw, h_fw = tf.unstack(fw_state, axis = 0)
+			c_bw, h_bw = tf.unstack(bw_state, axis = 0)
+			output_state = tf.contrib.rnn.core_rnn_cell.LSTMStateTuple(c_fw + c_bw, h_fw + h_bw)
 
 		return inputs, output, output_state
 

@@ -38,8 +38,15 @@ def buildModel(options):
 	
 	# most probably will have to set up the visual model first but let's make sure that the ptr net works! 
 	ptr_net = PointerNetwork(options.max_len, options.input_dim, options.hidden_dim, options.bidirectional, options.fc_dim, options.batch_size, options.inter_dim)
-	placeholder_inputs, seq_lens, targets = ptr_net.get_input_placeholders() # will change this to visual model input once time permits
-	inputs, attention_states, encoder_end_states = ptr_net.encode(placeholder_inputs, seq_lens)
+	if options.use_cnn:
+		placeholder_inputs, seq_lens, targets, inputfn = ptr_net.get_input_placeholders(options.use_cnn) # will change this to visual model input once time permits
+	else:
+		placeholder_inputs, seq_lens, targets = ptr_net.get_input_placeholders(options.use_cnn) # will change this to visual model input once time permits
+	with tf.variable_scope('encoder'):
+		inputs, attention_states, encoder_end_states = ptr_net.encode(placeholder_inputs, seq_lens)
+	if options.use_cnn:
+		with tf.variable_scope('encoder', reuse=True):
+			test_inputs, test_attention_states, test_encoder_end_states = ptr_net.encode(placeholder_inputs, seq_lens, process='CNN', is_training=False)
 
 	with tf.variable_scope("decoder"):
 		# need to transform inputs
@@ -47,7 +54,10 @@ def buildModel(options):
 		outputs, final_state  = ptr_net.decode(train_inputs, attention_states, encoder_end_states, seq_lens, train=1)
 
 	with tf.variable_scope("decoder", reuse=True):
-		predictions, final_state = ptr_net.decode(inputs, attention_states, encoder_end_states, seq_lens, train=0)
+		if options.use_cnn:
+			predictions, final_state = ptr_net.decode(test_inputs, test_attention_states, test_encoder_end_states, seq_lens, train=0)
+		else:
+			predictions, final_state = ptr_net.decode(inputs, attention_states, encoder_end_states, seq_lens, train=0)
 
 	outputs = tf.reshape(outputs, [-1, options.max_len])
 	targets_flat = tf.reshape(targets, [-1, options.max_len])
@@ -66,6 +76,8 @@ def buildModel(options):
 	flat_pred = tf.reshape(predictions, [-1, options.max_len])
 	val_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=flat_pred, labels=targets_flat))
 
+	if options.use_cnn:
+		return placeholder_inputs, targets, seq_lens, predictions, val_loss, loss, train_op, inputfn
 	return placeholder_inputs, targets, seq_lens, predictions, val_loss, loss, train_op
 
 
@@ -77,7 +89,10 @@ def train(data, options):
 	x_val , y_val, val_seq_lens  = data["val"]
 	X_test, y_test, test_seq_lens = data["test"]
 
-	input_x, input_y, seq_lens,  predictions, val_loss, loss, train_op = buildModel(options)
+	if options.use_cnn:
+		input_x, input_y, seq_lens,  predictions, val_loss, loss, train_op, inputfn = buildModel(options)
+	else:
+		input_x, input_y, seq_lens,  predictions, val_loss, loss, train_op = buildModel(options)
 
 	# merged = tf.summary.merge_all()
 	saver = tf.train.Saver()
@@ -87,6 +102,7 @@ def train(data, options):
 		# test_writer = tf.summary.FileWriter(options.log_dir + "/" + model_str + "/test", sess.graph())
 		init = tf.global_variables_initializer()
 		sess.run(init)
+		if options.use_cnn: sess.run(inputfn)
 		if options.load_ckpt:
 			print "Loading from checkpoint..."
 			saver.restore(sess, options.ckpt_dir + "/" + model_str + "/model.ckpt")
@@ -148,11 +164,12 @@ if __name__ == "__main__":
 	parser.add_option("--fc_dim", type=int, dest='fc_dim', default=512) # TO DO : FIND BEST 
 	parser.add_option("--inter_dim", type=int, dest='inter_dim', default=2048) # TO DO : FIND BEST 
 	parser.add_option("--reg", type=float, dest='reg', default=0) # TO DO : FIND BEST 
-
+	parser.add_option("--use_cnn", action="store_true", dest="use_cnn", default=True)
 	options, args = parser.parse_args()
 
 	print 'Loading Data'
-	data = getData(options.puzzle_height, options.puzzle_width, options.batch_size)
+	
+	data = getData(options.puzzle_height, options.puzzle_width, options.batch_size, options.use_cnn)
 	# import cPickle as pickle
 	# with open(r'data_file', 'rb') as savef:
 	# 	data = pickle.load(savef) #pickle.dump(data, savef) #
