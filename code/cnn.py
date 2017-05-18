@@ -13,35 +13,44 @@
 # dataset_utils.download_and_uncompress_tarball(url, checkpoints_dir)
 
 
-import numpy as np
-import os
 import tensorflow as tf
-import urllib2
-import tensorflow.contrib.slim as slim
+import os
+#from tensorflow.contrib.slim.nets import vgg
 import vgg
 
 slim = tf.contrib.slim
 
 
+
 class  CNN_FeatureExtractor(object):
-	def __init__(self, ):
+	def __init__(self ):
 		self.endpt_str = 'vgg_16/pool5' 
 		self.checkpoints_dir = "../ckpts"
 		self.dummy_classes = 1000
-		
+	
 
-	def CNNFeatureExtractor(self, input_tensor, img_height, img_width, is_training):
+	def CNNFeatureExtractor(self, input_tensor, is_training):
 		print 'Starting CNNFeatureExtractor'
-		with slim.arg_scope(vgg.vgg_arg_scope()):
-			pool_5_net = vgg.vgg_16(input_tensor, num_classes=self.dummy_classes, is_training=is_training)
+		#with slim.arg_scope(vgg.vgg_arg_scope()):
+		pool_5_net = vgg.vgg_16(input_tensor, is_training=is_training)
+		print 'Extracted CNN features'
+		
 		return pool_5_net
 
 	def getInputFn(self):
+		
+		variables_to_restore = slim.get_variables_to_restore(exclude=['fc6', 'fc7', 'fc8'])
 		init_fn = slim.assign_from_checkpoint_fn(
 	        os.path.join(self.checkpoints_dir, 'vgg_16.ckpt'),
-	        slim.get_model_variables('vgg_16'))
+	        variables_to_restore) 
+	        #slim.get_model_variables('vgg_16'))
 		return init_fn
 
+# inputt = tf.placeholder(tf.float32, [None,224, 224, 3])
+# fs = CNN_FeatureExtractor()
+# pnet = fs.CNNFeatureExtractor(inputt, True)
+# init = fs.getInputFn()
+# print 'done'
 
 
     

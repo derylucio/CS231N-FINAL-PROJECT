@@ -29,13 +29,10 @@ class PointerNetwork(object):
 			inputs = tf.placeholder(tf.float32, shape=(None, self.max_len, self.input_dim), name='Encoder_input')
 		else:
 			inputs = tf.placeholder(tf.float32, shape=(None, self.max_len, self.img_height, self.img_width, self.img_depth), name='Encoder_input')
+		 
 		seq_lengths = tf.placeholder(tf.int32, [None, ], name='seq_input')
 		targets = tf.placeholder(tf.int32, [None, self.max_len, self.max_len], name="targets")
-		if not use_cnn:
-			return inputs, seq_lengths, targets
-		else:
-			inpfn = self.cnn_f_extractor.getInputFn()
-			return inputs, seq_lengths, targets, inpfn
+		return inputs, seq_lengths, targets
 
 	def encode(self, orig_inputs, seq_lengths, process='FC', is_training=True):
 		if process == 'FC':
@@ -45,9 +42,9 @@ class PointerNetwork(object):
 			inputs = tf.reshape(inputs, [-1, self.max_len, self.fc_dim])
 		elif process == 'CNN':
 			orig_inputs = tf.reshape(orig_inputs, [-1, self.img_height, self.img_width, self.img_depth])
-			features = self.cnn_f_extractor.CNNFeatureExtractor(orig_inputs, self.img_height, self.img_width, is_training)
+			features = self.cnn_f_extractor.CNNFeatureExtractor(orig_inputs, is_training)
 			inputs = tf.reshape(features, [-1, self.max_len, self.fc_dim])
-
+			input_fn = self.cnn_f_extractor.getInputFn()
 		if not self.bidirectional:
 			cell = tf.contrib.rnn.LSTMCell(self.hidden_dim, initializer = self.init)
 			output, output_state = tf.nn.dynamic_rnn(cell, inputs, sequence_length=seq_lengths, dtype=tf.float32)
@@ -62,8 +59,10 @@ class PointerNetwork(object):
 			c_fw, h_fw = tf.unstack(fw_state, axis = 0)
 			c_bw, h_bw = tf.unstack(bw_state, axis = 0)
 			output_state = tf.contrib.rnn.core_rnn_cell.LSTMStateTuple(c_fw + c_bw, h_fw + h_bw)
-
-		return inputs, output, output_state
+		if process == 'CNN': 
+			return inputs, output, output_state, input_fn
+		else: 
+			return inputs, output, output_state
 
 # might need to stop gradients for inputs when doing tests
 # should probably implement glimpses : https://github.com/devsisters/pointer-network-tensorflow/blob/master/layers.py
